@@ -680,11 +680,10 @@ function MessageDiagnostics({ user, activeConvo }: { user: any, activeConvo: Con
         if (activeConvo) {
             try {
                 // Check if we can SELECT messages
-                const { error: msgError } = await getMessages(activeConvo.id)
-                if (msgError) addLog(`❌ Fetch Messages Error: ${msgError.message}`)
-                else addLog('✅ Read Messages Permission: OK')
+                await getMessages(activeConvo.id)
+                addLog('✅ Read Messages Permission: OK')
             } catch (err: any) {
-                addLog(`❌ Permission Check Failed: ${err.message}`)
+                addLog(`❌ Fetch Messages Error: ${err.message}`)
             }
         }
 

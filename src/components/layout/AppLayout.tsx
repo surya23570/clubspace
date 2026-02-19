@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { RightSidebar } from './RightSidebar'
 import { MobileNav } from './MobileNav'
@@ -12,7 +12,6 @@ export function AppLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [searchOpen, setSearchOpen] = useState(false)
     const [notificationsOpen, setNotificationsOpen] = useState(false)
-    const location = useLocation()
 
     // Close sidebar on route change
     const handleNavClick = () => setSidebarOpen(false)
