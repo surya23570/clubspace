@@ -1,0 +1,324 @@
+@import 'tailwindcss';
+
+/* ─── Claymorphism Design Tokens ──────────────────────────────────────── */
+@theme {
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+
+  --color-accent-400: var(--color-accent-400);
+  --color-accent-500: var(--color-accent-500);
+
+  --color-surface-50: var(--color-surface-50);
+  --color-surface-100: var(--color-surface-100);
+  --color-surface-200: var(--color-surface-200);
+  --color-surface-300: var(--color-surface-300);
+  --color-surface-400: var(--color-surface-400);
+  --color-surface-500: var(--color-surface-500);
+  --color-surface-600: var(--color-surface-600);
+  --color-surface-700: var(--color-surface-700);
+  --color-surface-800: var(--color-surface-800);
+  --color-surface-900: var(--color-surface-900);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+
+  /* Clay shadows */
+  --shadow-clay: var(--shadow-clay);
+  --shadow-clay-sm: var(--shadow-clay-sm);
+  --shadow-clay-lg: var(--shadow-clay-lg);
+  --shadow-clay-hover: var(--shadow-clay-hover);
+  --shadow-clay-inset: var(--shadow-clay-inset);
+  --shadow-clay-button: var(--shadow-clay-button);
+  --shadow-clay-pressed: var(--shadow-clay-pressed);
+  --shadow-modal: var(--shadow-modal);
+
+  --radius-clay: 20px;
+  --radius-clay-sm: 14px;
+  --radius-clay-lg: 28px;
+  --radius-pill: 100px;
+
+  --font-sans: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+}
+
+/* ─── Color & Shadow Definitions ────────────────────────────────────────── */
+:root {
+  /* Primary - Indigo/Violet */
+  --color-primary-50: #f0f0ff;
+  --color-primary-100: #e0e0ff;
+  --color-primary-200: #c7c7ff;
+  --color-primary-300: #a5a5ff;
+  --color-primary-400: #8484ff;
+  --color-primary-500: #6c63ff;
+  --color-primary-600: #5a52d5;
+  --color-primary-700: #4840ab;
+  --color-primary-800: #363082;
+  --color-primary-900: #252058;
+
+  /* Accent - Pink/Coral */
+  --color-accent-400: #ff9a9e;
+  --color-accent-500: #ff6b81;
+
+  /* Surface - Warm Grey/Sand */
+  --color-surface-50: #fefefe;
+  --color-surface-100: #f5f3f0;
+  --color-surface-200: #e8e4de;
+  --color-surface-300: #d5d0c8;
+  --color-surface-400: #a8a29e;
+  --color-surface-500: #8a8480;
+  --color-surface-600: #6b6560;
+  --color-surface-700: #4d4844;
+  --color-surface-800: #302c29;
+  --color-surface-900: #1c1a18;
+
+  /* Status */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+
+  /* Shadows (Light Mode) */
+  --shadow-clay: 8px 8px 16px rgba(0, 0, 0, 0.08), -4px -4px 12px rgba(255, 255, 255, 0.9);
+  --shadow-clay-sm: 4px 4px 10px rgba(0, 0, 0, 0.06), -2px -2px 8px rgba(255, 255, 255, 0.8);
+  --shadow-clay-lg: 12px 12px 24px rgba(0, 0, 0, 0.1), -6px -6px 16px rgba(255, 255, 255, 0.95);
+  --shadow-clay-hover: 10px 10px 20px rgba(0, 0, 0, 0.1), -5px -5px 15px rgba(255, 255, 255, 0.95);
+  --shadow-clay-inset: inset 4px 4px 8px rgba(0, 0, 0, 0.06), inset -2px -2px 6px rgba(255, 255, 255, 0.7);
+  --shadow-clay-button: 5px 5px 12px rgba(0, 0, 0, 0.1), -3px -3px 8px rgba(255, 255, 255, 0.8);
+  --shadow-clay-pressed: inset 3px 3px 6px rgba(0, 0, 0, 0.08), inset -2px -2px 4px rgba(255, 255, 255, 0.5);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.3);
+
+  /* Backgrounds */
+  --bg-body: #f0ebe3;
+  --bg-clay: #f7f4f0;
+  --bg-clay-inset: #ece8e1;
+}
+
+/* Dark Mode Overrides */
+.dark {
+  /* Re-map surfaces to dark grays */
+  --color-surface-50: #1a1b1e;
+  --color-surface-100: #25262b;
+  --color-surface-200: #2c2e33;
+  --color-surface-300: #373a40;
+  --color-surface-400: #5c5f66;
+  --color-surface-500: #909296;
+  --color-surface-600: #c1c2c5;
+  --color-surface-700: #dfe2e6;
+  --color-surface-800: #f1f3f5;
+  --color-surface-900: #f8f9fa;
+
+  /* Adjust Primary for better contrast in dark mode if needed,
+     or keep the same. Let's slightly desaturate/lighten for dark mode reading */
+  --color-primary-500: #7e76ff;
+
+  /* Shadows (Dark Mode) - relying more on lighter highlights for depth */
+  --shadow-clay: 8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.05);
+  --shadow-clay-sm: 4px 4px 10px rgba(0, 0, 0, 0.4), -2px -2px 8px rgba(255, 255, 255, 0.05);
+  --shadow-clay-lg: 12px 12px 24px rgba(0, 0, 0, 0.5), -6px -6px 16px rgba(255, 255, 255, 0.05);
+  --shadow-clay-hover: 10px 10px 20px rgba(0, 0, 0, 0.5), -5px -5px 15px rgba(255, 255, 255, 0.05);
+  --shadow-clay-inset: inset 4px 4px 8px rgba(0, 0, 0, 0.4), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
+  --shadow-clay-button: 5px 5px 12px rgba(0, 0, 0, 0.4), -3px -3px 8px rgba(255, 255, 255, 0.1);
+  --shadow-clay-pressed: inset 3px 3px 6px rgba(0, 0, 0, 0.4), inset -2px -2px 4px rgba(255, 255, 255, 0.05);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+  /* Backgrounds */
+  --bg-body: #141517;
+  --bg-clay: #1a1b1e;
+  --bg-clay-inset: #141517;
+}
+
+/* ─── Base ─────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-body);
+  color: var(--color-surface-800);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-300);
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-400);
+}
+
+/* ─── Clay Utilities ───────────────────────────────────────────────────── */
+.clay {
+  background: var(--bg-clay);
+  border-radius: var(--radius-clay);
+  box-shadow: var(--shadow-clay);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.clay-sm {
+  background: var(--bg-clay);
+  border-radius: var(--radius-clay-sm);
+  box-shadow: var(--shadow-clay-sm);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.clay-lg {
+  background: var(--bg-clay);
+  border-radius: var(--radius-clay-lg);
+  box-shadow: var(--shadow-clay-lg);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.clay-inset {
+  background: var(--bg-clay-inset);
+  border-radius: var(--radius-clay-sm);
+  box-shadow: var(--shadow-clay-inset);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.clay-pressed {
+  box-shadow: var(--shadow-clay-pressed);
+}
+
+.clay-input {
+  background: var(--bg-clay-inset);
+  border: none;
+  border-radius: var(--radius-clay-sm);
+  box-shadow: var(--shadow-clay-inset);
+  transition: all 0.2s ease;
+  color: var(--color-surface-800);
+}
+
+.clay-input:focus {
+  outline: none;
+  box-shadow: var(--shadow-clay-inset), 0 0 0 3px rgba(108, 99, 255, 0.15);
+}
+
+/* ─── Animations ───────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  33% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+
+  66% {
+    transform: translateY(4px) rotate(-1deg);
+  }
+}
+
+@keyframes blobMove {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(20px, -15px) scale(1.05);
+  }
+
+  50% {
+    transform: translate(-10px, 10px) scale(0.95);
+  }
+
+  75% {
+    transform: translate(15px, 5px) scale(1.02);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out both;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-blob {
+  animation: blobMove 8s ease-in-out infinite;
+}
+
+/* ─── Skeleton ─────────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #e8e4de 25%, #f0ebe3 50%, #e8e4de 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-clay-sm);
+}
+
+/* ─── Safe Area (Mobile) ───────────────────────────────────────────────── */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
