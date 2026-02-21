@@ -46,7 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+            // If this is a password recovery event, redirect to the reset password page
+            if (event === 'PASSWORD_RECOVERY') {
+                // Use window.location since we're outside the Router
+                if (window.location.pathname !== '/reset-password') {
+                    window.location.href = '/reset-password'
+                    return
+                }
+            }
+
             setSession(s)
             setUser(s?.user ?? null)
             if (s?.user) {
