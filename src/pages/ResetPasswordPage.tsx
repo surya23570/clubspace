@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
 import { Sparkles, ArrowLeft, Lock, Check, AlertTriangle, Eye, EyeOff } from 'lucide-react'
@@ -7,7 +7,6 @@ import { usePageTitle } from '../hooks/usePageTitle'
 
 export function ResetPasswordPage() {
     usePageTitle('Set New Password')
-    const navigate = useNavigate()
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
@@ -17,30 +16,62 @@ export function ResetPasswordPage() {
     const [success, setSuccess] = useState(false)
     const [isValidSession, setIsValidSession] = useState(false)
     const [checking, setChecking] = useState(true)
+    const resolved = useRef(false)
 
     useEffect(() => {
-        // Listen for the PASSWORD_RECOVERY event fired by Supabase
-        // when the user clicks the reset link in their email
+        let timeoutId: ReturnType<typeof setTimeout>
+
+        const markValid = () => {
+            if (!resolved.current) {
+                resolved.current = true
+                setIsValidSession(true)
+                setChecking(false)
+            }
+        }
+
+        const markInvalid = () => {
+            if (!resolved.current) {
+                resolved.current = true
+                setIsValidSession(false)
+                setChecking(false)
+            }
+        }
+
+        // 1. Check URL hash for recovery tokens (Supabase appends #access_token=...&type=recovery)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        if (hashParams.get('type') === 'recovery') {
+            markValid()
+            return () => { }
+        }
+
+        // 2. Listen for the PASSWORD_RECOVERY event from Supabase
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
-                setIsValidSession(true)
-                setChecking(false)
-            } else if (session) {
-                // User already has a valid session (e.g., navigated here after the event already fired)
-                setIsValidSession(true)
-                setChecking(false)
+                markValid()
+            } else if (event === 'SIGNED_IN' && session) {
+                // Recovery flow may fire SIGNED_IN instead of PASSWORD_RECOVERY in some cases
+                markValid()
             }
         })
 
-        // Also check if there's already a session (the event may have fired before this component mounted)
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        // 3. Poll getSession() a few times to handle the async token exchange
+        //    (Supabase client may need time to process the URL hash tokens)
+        const checkSession = async (retries = 0) => {
+            const { data: { session } } = await supabase.auth.getSession()
             if (session) {
-                setIsValidSession(true)
+                markValid()
+            } else if (retries < 3) {
+                timeoutId = setTimeout(() => checkSession(retries + 1), 1000)
+            } else {
+                markInvalid()
             }
-            setChecking(false)
-        })
+        }
+        checkSession()
 
-        return () => subscription.unsubscribe()
+        return () => {
+            subscription.unsubscribe()
+            clearTimeout(timeoutId)
+        }
     }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
