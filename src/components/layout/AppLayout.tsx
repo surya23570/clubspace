@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { RightSidebar } from './RightSidebar'
-import { MobileNav } from './MobileNav'
 import { TopBar } from './TopBar'
 import { SearchOverlay } from '../features/SearchOverlay'
 import { NotificationsOverlay } from '../features/NotificationsOverlay'
@@ -43,7 +42,7 @@ export function AppLayout() {
                     <Sidebar mobileOpen={sidebarOpen} onNavClick={handleNavClick} />
 
                     {/* Main Feed */}
-                    <main className="flex-1 min-w-0 px-4 py-5 pb-28 lg:pb-6 lg:px-6">
+                    <main className="flex-1 min-w-0 px-4 py-5 pb-6 lg:pb-6 lg:px-6">
                         <div className="max-w-[640px] mx-auto">
                             <Outlet />
                         </div>
@@ -54,8 +53,6 @@ export function AppLayout() {
                 </div>
             </div>
 
-            {/* Mobile bottom nav */}
-            <MobileNav />
         </div>
     )
 }

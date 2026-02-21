@@ -3,8 +3,10 @@ import { PostCard } from '../components/feed/PostCard'
 import { getGalleryPosts } from '../lib/api'
 import type { Post } from '../types'
 import { Loader2, Image as ImageIcon } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function GalleryPage() {
+    usePageTitle('Gallery')
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
 

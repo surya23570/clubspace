@@ -13,8 +13,10 @@ import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import type { Conversation, Message, Profile } from '../types'
 import { Send, Search, ArrowLeft, Plus, MessageCircle, Check, CheckCheck, Image as ImageIcon, Shield, Trash2 } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function MessagesPage() {
+    usePageTitle('Messages')
     const { user } = useAuth()
     const [activeTab, setActiveTab] = useState<'active' | 'request'>('active')
     const [conversations, setConversations] = useState<Conversation[]>([])
@@ -172,7 +174,9 @@ export function MessagesPage() {
         try {
             const data = await getConversations(user.id, activeTab)
             setConversations(data)
-        } catch { /* silent */ }
+        } catch (err) {
+            console.error('Failed to load conversations:', err)
+        }
         setLoading(false)
     }
 
@@ -232,8 +236,9 @@ export function MessagesPage() {
             setActiveTab(convo.status) // Switch tab if it's a request
             await loadConversations()
             openConversation(convo)
-        } catch (err) {
+        } catch (err: any) {
             console.error("Failed to start new chat:", err)
+            alert(err.message || "Failed to start conversation")
         }
     }
 
@@ -242,7 +247,9 @@ export function MessagesPage() {
         try {
             const users = await getAllProfiles()
             setAllUsers(users.filter(u => u.id !== user?.id))
-        } catch { /* silent */ }
+        } catch (err) {
+            console.error('Failed to load users:', err)
+        }
     }
 
     const scrollToBottom = () => {

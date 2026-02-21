@@ -14,13 +14,16 @@ import {
     acceptFollowRequest,
     rejectFollowRequest,
     removeFollower,
-    blockUser
+    blockUser,
+    unblockUser,
+    isBlockedByMe
 } from '../lib/api'
 import { Card } from '../components/ui/Card'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { UserListModal } from '../components/features/UserListModal'
+import { PostCard } from '../components/feed/PostCard'
 import type { Profile, Post } from '../types'
 
 import {
@@ -28,11 +31,13 @@ import {
     UserPlus, UserCheck, Users, Lock, Clock, Shield, MessageCircle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function ProfilePage() {
     const { userId: paramUserId } = useParams()
     const navigate = useNavigate()
     const { user, refreshProfile } = useAuth()
+    usePageTitle('Profile')
 
     // Determine which profile to show
     const targetUserId = paramUserId || user?.id
@@ -46,9 +51,12 @@ export function ProfilePage() {
     const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted'>('none')
     const [incomingStatus, setIncomingStatus] = useState<'none' | 'pending' | 'accepted'>('none') // Status of them following us
     const [submittingFollow, setSubmittingFollow] = useState(false)
+    const [followError, setFollowError] = useState('')
+    const [blocked, setBlocked] = useState(false)
     const [followers, setFollowers] = useState<Profile[]>([])
     const [following, setFollowing] = useState<Profile[]>([])
     const [requests, setRequests] = useState<Profile[]>([])
+    const [submittingActionIds, setSubmittingActionIds] = useState<Set<string>>(new Set())
 
     // List Modals
     const [listModalOpen, setListModalOpen] = useState(false)
@@ -63,6 +71,14 @@ export function ProfilePage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
     useEffect(() => {
+        // Reset state when navigating between profiles
+        setFollowStatus('none')
+        setIncomingStatus('none')
+        setFollowError('')
+        setBlocked(false)
+        setFollowers([])
+        setFollowing([])
+        setRequests([])
         if (targetUserId) load()
     }, [targetUserId, user?.id])
 
@@ -95,14 +111,16 @@ export function ProfilePage() {
                 setRequests(reqs)
             }
 
-            // Check follow status if viewing someone else
-            if (user && !isOwnProfile) {
-                const [outStatus, inStatus] = await Promise.all([
+            // Check follow status and block status for other profiles
+            if (!isOwnProfile && user && p) {
+                const [status, incoming, blockedStatus] = await Promise.all([
                     getFollowStatus(user.id, targetUserId),
-                    getFollowStatus(targetUserId, user.id)
+                    getFollowStatus(targetUserId, user.id),
+                    isBlockedByMe(user.id, targetUserId)
                 ])
-                setFollowStatus(outStatus)
-                setIncomingStatus(inStatus)
+                setFollowStatus(status)
+                setIncomingStatus(incoming)
+                setBlocked(blockedStatus)
             }
         } catch (err) {
             console.error(err)
@@ -110,17 +128,40 @@ export function ProfilePage() {
         setLoading(false)
     }
 
+    const handleDeletePost = async (postId: string) => {
+        if (!confirm('Are you sure you want to delete this post?')) return
+        try {
+            const { deletePost } = await import('../lib/api')
+            await deletePost(postId)
+            setPosts(prev => prev.filter(p => p.id !== postId))
+        } catch (err: any) {
+            console.error(err)
+            alert(err.message || 'Failed to delete post')
+        }
+    }
+
     const handleFollowToggle = async () => {
         if (!user || !profile || submittingFollow) return
         setSubmittingFollow(true)
+        setFollowError('')
+
+        const previousStatus = followStatus
+        const previousFollowers = [...followers]
+
+        // Optimistic UI updates
+        if (followStatus === 'accepted' || followStatus === 'pending') {
+            setFollowStatus('none')
+            if (followStatus === 'accepted') {
+                setFollowers(prev => prev.filter(f => f.id !== user.id))
+            }
+        } else {
+            setFollowStatus(profile.is_private ? 'pending' : 'accepted')
+        }
+
         try {
-            if (followStatus === 'accepted' || followStatus === 'pending') {
+            if (previousStatus === 'accepted' || previousStatus === 'pending') {
                 // Unfollow or Cancel Request
                 await unfollowUser(user.id, profile.id)
-                setFollowStatus('none')
-                if (followStatus === 'accepted') {
-                    setFollowers(prev => prev.filter(f => f.id !== user.id))
-                }
             } else {
                 // Follow
                 await followUser(user.id, profile.id)
@@ -130,17 +171,31 @@ export function ProfilePage() {
 
                 if (newStatus === 'accepted') {
                     const myProfile = await getProfile(user.id)
-                    if (myProfile) setFollowers(prev => [...prev, myProfile])
+                    if (myProfile) {
+                        setFollowers(prev => {
+                            if (prev.find(f => f.id === myProfile.id)) return prev
+                            return [...prev, myProfile]
+                        })
+                    }
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
+            // Rollback optimistic updates
+            setFollowStatus(previousStatus)
+            setFollowers(previousFollowers)
+
+            setFollowError(err?.message || 'Follow action failed. Please try again.')
+            setTimeout(() => setFollowError(''), 4000)
+        } finally {
+            setSubmittingFollow(false)
         }
-        setSubmittingFollow(false)
     }
 
     const handleListAction = async (targetId: string, action: 'follow' | 'unfollow' | 'accept' | 'reject' | 'remove') => {
-        if (!user) return
+        if (!user || submittingActionIds.has(targetId)) return
+
+        setSubmittingActionIds(prev => new Set(prev).add(targetId))
         try {
             if (action === 'accept') {
                 await acceptFollowRequest(targetId, user.id)
@@ -166,8 +221,16 @@ export function ProfilePage() {
                 await removeFollower(user.id, targetId)
                 setFollowers(prev => prev.filter(f => f.id !== targetId))
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
+            setFollowError(err?.message || 'Action failed. Please try again.')
+            setTimeout(() => setFollowError(''), 4000)
+        } finally {
+            setSubmittingActionIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(targetId)
+                return newSet
+            })
         }
     }
 
@@ -176,10 +239,22 @@ export function ProfilePage() {
         if (!confirm('Are you sure you want to block this user? They will not be able to find your profile, posts, or story.')) return
         try {
             await blockUser(user.id, profile.id)
-            // Redirect home or show blocked state
-            window.location.href = '/'
-        } catch (err) {
+            setBlocked(true)
+            setFollowStatus('none')
+        } catch (err: any) {
             console.error(err)
+            alert('Failed to block user: ' + (err.message || 'Unknown error'))
+        }
+    }
+
+    const handleUnblock = async () => {
+        if (!user || !profile) return
+        try {
+            await unblockUser(user.id, profile.id)
+            setBlocked(false)
+        } catch (err: any) {
+            console.error(err)
+            alert('Failed to unblock user: ' + (err.message || 'Unknown error'))
         }
     }
 
@@ -196,7 +271,9 @@ export function ProfilePage() {
             setShowEdit(false)
             refreshProfile()
             load()
-        } catch { /* silent */ }
+        } catch (err) {
+            console.error('Failed to save profile:', err)
+        }
         setSaving(false)
     }
 
@@ -307,7 +384,7 @@ export function ProfilePage() {
                                             followStatus === 'pending' ? 'Requested' :
                                                 'Follow'}
                                     </Button>
-                                    {followStatus === 'accepted' && (
+                                    {(followStatus === 'accepted' || !profile.is_private) && (
                                         <Button
                                             variant="secondary"
                                             size="sm"
@@ -320,10 +397,11 @@ export function ProfilePage() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-surface-400 hover:text-red-500"
-                                        onClick={handleBlock}
+                                        className={blocked ? 'text-red-500 hover:text-red-600' : 'text-surface-400 hover:text-red-500'}
+                                        onClick={blocked ? handleUnblock : handleBlock}
                                         icon={<Shield size={16} />}
                                     >
+                                        {blocked ? 'Unblock' : ''}
                                     </Button>
                                 </>
                             )}
@@ -331,6 +409,14 @@ export function ProfilePage() {
                     </div>
                 </div>
             </div>
+
+            {/* Follow Error Banner */}
+            {followError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm flex items-center justify-between">
+                    <span>{followError}</span>
+                    <button onClick={() => setFollowError('')} className="text-red-400 hover:text-red-600 ml-2">&times;</button>
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
@@ -393,21 +479,13 @@ export function ProfilePage() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <Card key={post.id} hover className="flex items-center gap-4">
-                                        <div className="w-16 h-16 rounded-[var(--radius-clay-sm)] overflow-hidden bg-surface-200 flex-shrink-0">
-                                            {post.media_type === 'image' ? (
-                                                <img src={post.media_url} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50">
-                                                    <span className="text-lg">{post.media_type === 'video' ? '🎬' : '🎵'}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-surface-700 truncate">{post.description || 'Untitled'}</p>
-                                            <p className="text-xs text-surface-400 mt-0.5">{post.category} · {new Date(post.created_at).toLocaleDateString()}</p>
-                                        </div>
-                                    </Card>
+                                    <div className="animate-fade-in-up">
+                                        <PostCard
+                                            post={{ ...post, profile: profile }}
+                                            showActions={true}
+                                            onDelete={handleDeletePost}
+                                        />
+                                    </div>
                                 )
                             ))}
                         </div>
@@ -432,6 +510,8 @@ export function ProfilePage() {
                 type={listModalType}
                 currentUserId={user?.id || ''}
                 onAction={handleListAction}
+                isOwnProfile={isOwnProfile}
+                submittingActionIds={submittingActionIds}
             />
 
             {/* Edit Modal (Only render if own profile) */}

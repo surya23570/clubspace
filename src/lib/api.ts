@@ -65,11 +65,24 @@ export async function createPost(post: {
 export async function getMonthlyPosts(
     year: number,
     month: number,
-    sort: 'recents' | 'popular' = 'recents',
-    category?: PostCategory
+    sort: 'recents' | 'popular' | 'friends' = 'recents',
+    category?: PostCategory,
+    userId?: string
 ): Promise<Post[]> {
     const startDate = new Date(year, month - 1, 1).toISOString()
     const endDate = new Date(year, month, 0, 23, 59, 59).toISOString()
+
+    // For friends tab, get IDs of users the current user follows
+    let friendIds: string[] = []
+    if (sort === 'friends' && userId) {
+        const { data: follows } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', userId)
+            .eq('status', 'accepted')
+        friendIds = (follows || []).map(f => f.following_id)
+        if (friendIds.length === 0) return [] // Not following anyone
+    }
 
     let query = supabase
         .from('posts')
@@ -77,15 +90,15 @@ export async function getMonthlyPosts(
         .gte('created_at', startDate)
         .lte('created_at', endDate)
 
+    if (sort === 'friends' && friendIds.length > 0) {
+        query = query.in('user_id', friendIds)
+    }
+
     if (category) {
         query = query.eq('category', category)
     }
 
-    if (sort === 'popular') {
-        query = query.order('created_at', { ascending: false })
-    } else {
-        query = query.order('created_at', { ascending: false })
-    }
+    query = query.order('created_at', { ascending: false })
 
     const { data, error } = await query
     if (error) throw error
@@ -110,8 +123,52 @@ export async function getUserPosts(userId: string): Promise<Post[]> {
 }
 
 export async function deletePost(postId: string): Promise<void> {
-    const { error } = await supabase.from('posts').delete().eq('id', postId)
-    if (error) throw error
+    // 1. Get the post details to find the Cloudinary Public ID and Resource Type
+    const { data: post, error: fetchError } = await supabase
+        .from('posts')
+        .select('media_url, media_type, user_id')
+        .eq('id', postId)
+        .single()
+
+    if (fetchError) throw fetchError
+    if (!post) throw new Error('Post not found')
+
+    // 2. Extract Cloudinary public_id from securely structured URL
+    if (post.media_url && post.media_url.includes('cloudinary.com')) {
+        try {
+            // URL format example: https://res.cloudinary.com/cloud_name/image/upload/v1234/folder/public_id.jpg
+            const urlParts = post.media_url.split('/')
+            const filenameWithExt = urlParts[urlParts.length - 1]
+            const folder = urlParts[urlParts.length - 2]
+
+            // Extract the public_id from the filename (removing the extension)
+            const publicIdRaw = filenameWithExt.split('.')[0]
+            const publicId = `${folder}/${publicIdRaw}` // Cloudinary requires 'folder/filename' if it exists in a folder
+
+            const resourceType = post.media_type === 'audio' ? 'video' : post.media_type
+
+            // 3. Call our Supabase Edge Function to delete the media securely
+            const { error: fnError } = await supabase.functions.invoke('delete-cloudinary-media', {
+                body: {
+                    public_id: publicId,
+                    resource_type: resourceType,
+                    my_post_id: postId
+                },
+            })
+
+            if (fnError) {
+                console.error('Failed to delete media from Cloudinary:', fnError)
+                // We decide to continue and delete the DB record anyway, 
+                // but you could choose to throw an error here to prevent DB deletion if media deletion fails.
+            }
+        } catch (mediaError) {
+            console.error('Error extracting Cloudinary details:', mediaError)
+        }
+    }
+
+    // 4. Delete the post from the database (RLS handles security)
+    const { error: deleteError } = await supabase.from('posts').delete().eq('id', postId)
+    if (deleteError) throw deleteError
 }
 
 export async function getGalleryPosts(): Promise<Post[]> {
@@ -130,7 +187,6 @@ export async function getReactions(postId: string): Promise<Reaction[]> {
     const { data, error } = await supabase
         .from('reactions')
         .select('*')
-        .eq('post_id', postId)
         .eq('post_id', postId)
     if (error) throw error
     return data || []
@@ -322,16 +378,25 @@ export async function getConversations(userId: string, type: 'active' | 'request
             }
         })
         .filter(c => !c.deleted_for.includes(userId))
+        .filter(c => c.other_profile !== null) // Filter out blocked/hidden users
 
-    // Count unread for each conversation
-    for (const convo of conversations) {
-        const { count } = await supabase
+    // Count unread for all conversations in a single batch query
+    const convoIds = conversations.map(c => c.id)
+    if (convoIds.length > 0) {
+        const { data: unreadMsgs } = await supabase
             .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', convo.id)
+            .select('conversation_id')
+            .in('conversation_id', convoIds)
             .eq('is_read', false)
             .neq('sender_id', userId)
-        convo.unread_count = count || 0
+
+        const unreadMap = new Map<string, number>()
+        for (const msg of unreadMsgs || []) {
+            unreadMap.set(msg.conversation_id, (unreadMap.get(msg.conversation_id) || 0) + 1)
+        }
+        for (const convo of conversations) {
+            convo.unread_count = unreadMap.get(convo.id) || 0
+        }
     }
 
     return conversations
@@ -343,6 +408,29 @@ export async function getOrCreateConversation(
 ): Promise<Conversation> {
     // Normalize order so we don't get duplicates
     const [p1, p2] = [userId, otherUserId].sort()
+
+    // Check privacy settings
+    const { data: targetProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_private')
+        .eq('id', otherUserId)
+        .single()
+
+    if (profileError) throw profileError
+
+    if (targetProfile.is_private) {
+        // Must be following to message
+        const { data: follow } = await supabase
+            .from('follows')
+            .select('status')
+            .eq('follower_id', userId)
+            .eq('following_id', otherUserId)
+            .maybeSingle()
+
+        if (!follow || follow.status !== 'accepted') {
+            throw new Error('You must follow this private account to message them.')
+        }
+    }
 
     // Check existing
     const { data: existing } = await supabase
@@ -490,11 +578,13 @@ export async function blockUser(blockerId: string, blockedId: string): Promise<v
     const { error } = await supabase
         .from('blocks')
         .insert({ blocker_id: blockerId, blocked_id: blockedId })
-    if (error) throw error
 
-    // Also remove any existing follow relationships
-    await unfollowUser(blockerId, blockedId)
-    await unfollowUser(blockedId, blockerId)
+    // Ignore duplicate key error (already blocked)
+    if (error && error.code !== '23505') throw error
+
+    // Manual unfollow not needed anymore (handled by SQL trigger), 
+    // but we can keep it for client-side optimism if we didn't trust triggers, 
+    // but relying on trigger is cleaner.
 }
 
 export async function unblockUser(blockerId: string, blockedId: string): Promise<void> {
@@ -506,13 +596,23 @@ export async function unblockUser(blockerId: string, blockedId: string): Promise
     if (error) throw error
 }
 
-export async function getBlockedUsers(userId: string): Promise<string[]> {
+export async function getBlockedUsers(userId: string): Promise<Profile[]> {
     const { data, error } = await supabase
         .from('blocks')
-        .select('blocked_id')
+        .select('blocked:profiles!blocks_blocked_id_fkey(*)')
         .eq('blocker_id', userId)
     if (error) throw error
-    return data?.map((d: any) => d.blocked_id) || []
+    return data?.map((d: any) => d.blocked) || []
+}
+
+export async function isBlockedByMe(blockerId: string, blockedId: string): Promise<boolean> {
+    const { data } = await supabase
+        .from('blocks')
+        .select('id')
+        .eq('blocker_id', blockerId)
+        .eq('blocked_id', blockedId)
+        .maybeSingle()
+    return !!data
 }
 
 // ─── Follows ────────────────────────────────────────────────────────────────
@@ -526,6 +626,13 @@ export async function followUser(followerId: string, followingId: string): Promi
         .single()
 
     const status = targetUser?.is_private ? 'pending' : 'accepted'
+
+    // Delete any existing follow row first (handles re-follow after unfollow/reject)
+    await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', followerId)
+        .eq('following_id', followingId)
 
     const { error } = await supabase
         .from('follows')
@@ -570,7 +677,9 @@ export async function getFollowers(userId: string): Promise<Profile[]> {
         .eq('following_id', userId)
         .eq('status', 'accepted')
     if (error) throw error
-    return data?.map((d: any) => d.follower) || []
+    return (data || [])
+        .map((d: any) => d.follower)
+        .filter((p: any) => p !== null) // Filter out blocked/hidden profiles
 }
 
 export async function getFollowRequests(userId: string): Promise<Profile[]> {
@@ -580,7 +689,9 @@ export async function getFollowRequests(userId: string): Promise<Profile[]> {
         .eq('following_id', userId)
         .eq('status', 'pending')
     if (error) throw error
-    return data?.map((d: any) => d.follower) || []
+    return (data || [])
+        .map((d: any) => d.follower)
+        .filter((p: any) => p !== null) // Filter out blocked/hidden profiles
 }
 
 export async function acceptFollowRequest(followerId: string, followingId: string): Promise<void> {
@@ -608,7 +719,9 @@ export async function getFollowing(userId: string): Promise<Profile[]> {
         .eq('follower_id', userId)
         .eq('status', 'accepted')
     if (error) throw error
-    return data?.map((d: any) => d.following) || []
+    return (data || [])
+        .map((d: any) => d.following)
+        .filter((p: any) => p !== null) // Filter out blocked/hidden profiles
 }
 
 // ─── Notifications ──────────────────────────────────────────────────────────
@@ -616,7 +729,7 @@ export async function getFollowing(userId: string): Promise<Profile[]> {
 export async function getNotifications(userId: string): Promise<Notification[]> {
     const { data, error } = await supabase
         .from('notifications')
-        .select('*, actor:profiles(*)')
+        .select('*, actor:profiles!notifications_actor_id_fkey(*)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20)
@@ -637,7 +750,22 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', userId)
-        .eq('is_read', false)
+    if (error) throw error
+}
+
+export async function deleteNotification(notificationId: string): Promise<void> {
+    const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+    if (error) throw error
+}
+
+export async function deleteAllNotifications(userId: string): Promise<void> {
+    const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
     if (error) throw error
 }
 

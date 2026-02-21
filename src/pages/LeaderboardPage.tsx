@@ -4,8 +4,10 @@ import { Card } from '../components/ui/Card'
 import { Avatar } from '../components/ui/Avatar'
 import type { LeaderboardEntry } from '../types'
 import { Trophy, Crown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function LeaderboardPage() {
+    usePageTitle('Leaderboard')
     const [entries, setEntries] = useState<LeaderboardEntry[]>([])
     const [loading, setLoading] = useState(true)
     const [month, setMonth] = useState(() => {
@@ -21,7 +23,9 @@ export function LeaderboardPage() {
             const [year, m] = month.split('-').map(Number)
             const data = await getLeaderboard(year, m)
             setEntries(data)
-        } catch { /* silent */ }
+        } catch (err) {
+            console.error('Failed to load leaderboard:', err)
+        }
         setLoading(false)
     }
 

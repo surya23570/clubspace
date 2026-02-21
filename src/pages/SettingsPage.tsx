@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { updateProfile, changePassword, deleteAccount } from '../lib/api'
+import { updateProfile, changePassword, deleteAccount, unblockUser, getBlockedUsers } from '../lib/api'
 import { uploadToCloudinary } from '../lib/cloudinary'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -10,10 +10,12 @@ import {
     User, Lock, Palette, LogOut, Trash2, Shield,
     Camera, Check, AlertTriangle, Sun, Moon,
 } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
-const SECTIONS = ['Profile', 'Account', 'Appearance', 'Danger Zone'] as const
+const SECTIONS = ['Profile', 'Account', 'Appearance', 'Privacy', 'Danger Zone'] as const
 
 export function SettingsPage() {
+    usePageTitle('Settings')
     const { user, profile, signOut, refreshProfile, isAdmin } = useAuth()
     const [activeSection, setActiveSection] = useState<typeof SECTIONS[number]>('Profile')
 
@@ -26,6 +28,7 @@ export function SettingsPage() {
     })
     const [profileSaving, setProfileSaving] = useState(false)
     const [profileSuccess, setProfileSuccess] = useState(false)
+    const [profileError, setProfileError] = useState('')
 
     // Password form
     const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' })
@@ -64,12 +67,15 @@ export function SettingsPage() {
         if (!user) return
         setProfileSaving(true)
         setProfileSuccess(false)
+        setProfileError('')
         try {
             await updateProfile(user.id, profileForm)
             await refreshProfile()
             setProfileSuccess(true)
             setTimeout(() => setProfileSuccess(false), 3000)
-        } catch { /* silent */ }
+        } catch (err) {
+            setProfileError(err instanceof Error ? err.message : 'Failed to save profile')
+        }
         setProfileSaving(false)
     }
 
@@ -102,20 +108,58 @@ export function SettingsPage() {
         document.documentElement.classList.toggle('dark', newTheme === 'dark')
     }
 
+    const [deleteError, setDeleteError] = useState('')
+
     const handleDeleteAccount = async () => {
         if (!user || deleteConfirm !== 'DELETE') return
         setDeleting(true)
+        setDeleteError('')
         try {
             await deleteAccount(user.id)
             window.location.href = '/login'
-        } catch { /* silent */ }
+        } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete account')
+        }
         setDeleting(false)
+    }
+
+    // Blocked Users
+    const [blockedUsers, setBlockedUsers] = useState<any[]>([])
+    const [loadingBlocked, setLoadingBlocked] = useState(false)
+
+    useEffect(() => {
+        if (activeSection === 'Privacy' && user) {
+            loadBlocked()
+        }
+    }, [activeSection, user])
+
+    const loadBlocked = async () => {
+        if (!user) return
+        setLoadingBlocked(true)
+        try {
+            const list = await getBlockedUsers(user.id)
+            setBlockedUsers(list)
+        } catch (err) {
+            console.error(err)
+        }
+        setLoadingBlocked(false)
+    }
+
+    const handleUnblock = async (blockedId: string) => {
+        if (!user) return
+        try {
+            await unblockUser(user.id, blockedId)
+            setBlockedUsers(prev => prev.filter(p => p.id !== blockedId))
+        } catch (err) {
+            console.error(err)
+        }
     }
 
     const sectionIcons: Record<typeof SECTIONS[number], typeof User> = {
         'Profile': User,
         'Account': Lock,
         'Appearance': Palette,
+        'Privacy': Shield,
         'Danger Zone': AlertTriangle,
     }
 
@@ -226,6 +270,9 @@ export function SettingsPage() {
                             <span className="flex items-center gap-1.5 text-sm font-medium text-success">
                                 <Check size={14} /> Saved!
                             </span>
+                        )}
+                        {profileError && (
+                            <p className="text-sm text-danger">{profileError}</p>
                         )}
                         <div className="ml-auto">
                             <Button variant="primary" onClick={handleProfileSave} loading={profileSaving}>
@@ -350,6 +397,57 @@ export function SettingsPage() {
                 </Card>
             )}
 
+            {/* Privacy Section (Blocked Users) */}
+            {activeSection === 'Privacy' && (
+                <Card className="space-y-4 animate-fade-in-up">
+                    <h3 className="font-bold text-surface-800 flex items-center gap-2">
+                        <Shield size={16} /> Blocked Accounts
+                    </h3>
+                    <p className="text-xs text-surface-400">
+                        Users you have blocked cannot find your profile, posts, or story. They will not be notified when you block them.
+                    </p>
+
+                    {loadingBlocked ? (
+                        <div className="space-y-2">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="flex items-center justify-between p-3 clay rounded-[var(--radius-clay-sm)]">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 skeleton rounded-full" />
+                                        <div className="h-3 w-24 skeleton" />
+                                    </div>
+                                    <div className="h-8 w-16 skeleton rounded-full" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : blockedUsers.length === 0 ? (
+                        <div className="text-center py-8 text-surface-400 text-sm">
+                            You haven't blocked anyone.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {blockedUsers.map(profile => (
+                                <div key={profile.id} className="flex items-center justify-between p-3 clay rounded-[var(--radius-clay-sm)]">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar src={profile.avatar_url} name={profile.full_name} size="sm" />
+                                        <div>
+                                            <p className="text-sm font-bold text-surface-800">{profile.full_name}</p>
+                                            <p className="text-[10px] text-surface-400">@{profile.full_name.toLowerCase().replace(/\s+/g, '')}</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => handleUnblock(profile.id)}
+                                    >
+                                        Unblock
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </Card>
+            )}
+
             {/* Delete Confirmation Modal */}
             <Modal isOpen={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeleteConfirm('') }} title="Delete Account" size="sm">
                 <div className="space-y-4">
@@ -370,6 +468,9 @@ export function SettingsPage() {
                             placeholder="DELETE"
                         />
                     </div>
+                    {deleteError && (
+                        <p className="text-sm text-danger clay-inset px-4 py-2.5">{deleteError}</p>
+                    )}
                     <div className="flex justify-end gap-3">
                         <Button variant="secondary" onClick={() => { setShowDeleteModal(false); setDeleteConfirm('') }}>Cancel</Button>
                         <Button

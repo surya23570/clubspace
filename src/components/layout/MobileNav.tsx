@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, TrendingUp, User, Shield } from 'lucide-react'
+import { Home, TrendingUp, User, Shield, MessageCircle, Image, Settings } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export function MobileNav() {
@@ -7,8 +7,11 @@ export function MobileNav() {
 
     const items = [
         { path: '/', icon: Home, label: 'Feed' },
-        { path: '/leaderboard', icon: TrendingUp, label: 'Explore' },
         { path: '/profile', icon: User, label: 'Profile' },
+        { path: '/leaderboard', icon: TrendingUp, label: 'Explore' },
+        { path: '/messages', icon: MessageCircle, label: 'Messages' },
+        { path: '/gallery', icon: Image, label: 'Gallery' },
+        { path: '/settings', icon: Settings, label: 'Settings' },
     ]
 
     if (isAdmin) {
@@ -23,6 +26,7 @@ export function MobileNav() {
                         key={path}
                         to={path}
                         end={path === '/'}
+                        aria-label={label}
                         className={({ isActive }) =>
                             `flex flex-col items-center gap-0.5 py-2 px-3 rounded-[var(--radius-clay-sm)] transition-all duration-200 ${isActive
                                 ? 'text-primary-500'

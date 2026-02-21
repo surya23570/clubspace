@@ -3,9 +3,10 @@ import { PostCard } from '../components/feed/PostCard'
 import { UploadModal } from '../components/upload/UploadModal'
 import { getMonthlyPosts } from '../lib/api'
 import type { Post, PostCategory } from '../types'
-import { Plus, Image } from 'lucide-react'
+import { Plus, Image, AlertCircle } from 'lucide-react'
 import { Avatar } from '../components/ui/Avatar'
 import { useAuth } from '../context/AuthContext'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const TABS = ['Recents', 'Friends', 'Popular'] as const
 const CATEGORIES: { value: PostCategory | 'all'; label: string }[] = [
@@ -18,9 +19,11 @@ const CATEGORIES: { value: PostCategory | 'all'; label: string }[] = [
 ]
 
 export function FeedPage() {
-    const { profile } = useAuth()
+    usePageTitle('Feed')
+    const { profile, user } = useAuth()
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [tab, setTab] = useState<typeof TABS[number]>('Recents')
     const [category, setCategory] = useState<PostCategory | 'all'>('all')
     const [showUpload, setShowUpload] = useState(false)
@@ -29,14 +32,29 @@ export function FeedPage() {
 
     const loadPosts = async () => {
         setLoading(true)
+        setError(null)
         try {
             const now = new Date()
-            const sort = tab === 'Popular' ? 'popular' : 'recents'
+            const sort = tab === 'Popular' ? 'popular' : tab === 'Friends' ? 'friends' : 'recents'
             const cat = category === 'all' ? undefined : category
-            const data = await getMonthlyPosts(now.getFullYear(), now.getMonth() + 1, sort, cat)
+            const data = await getMonthlyPosts(now.getFullYear(), now.getMonth() + 1, sort, cat, user?.id)
             setPosts(data)
-        } catch { /* silent */ }
+        } catch {
+            setError('Failed to load posts. Please try again.')
+        }
         setLoading(false)
+    }
+
+    const handleDeletePost = async (postId: string) => {
+        if (!confirm('Are you sure you want to delete this post?')) return
+        try {
+            const { deletePost } = await import('../lib/api') // dynamic import to avoid circular dependency if any, or just import at top
+            await deletePost(postId)
+            setPosts(prev => prev.filter(p => p.id !== postId))
+        } catch (err: any) {
+            console.error(err)
+            alert(err.message || 'Failed to delete post')
+        }
     }
 
     return (
@@ -95,6 +113,15 @@ export function FeedPage() {
                 </div>
             </div>
 
+            {/* Error Banner */}
+            {error && (
+                <div className="clay p-4 flex items-center gap-3 text-red-600 bg-red-50 border border-red-200 rounded-[var(--radius-clay)]">
+                    <AlertCircle size={18} className="shrink-0" />
+                    <p className="text-sm font-medium flex-1">{error}</p>
+                    <button onClick={loadPosts} className="text-xs font-bold text-red-600 hover:underline cursor-pointer">Retry</button>
+                </div>
+            )}
+
             {/* Posts */}
             {loading ? (
                 <div className="space-y-5">
@@ -129,7 +156,11 @@ export function FeedPage() {
                 <div className="space-y-5">
                     {posts.map((post, i) => (
                         <div key={post.id} style={{ animationDelay: `${i * 80}ms` }}>
-                            <PostCard post={post} />
+                            <PostCard
+                                post={post}
+                                showActions={true}
+                                onDelete={handleDeletePost}
+                            />
                         </div>
                     ))}
                 </div>

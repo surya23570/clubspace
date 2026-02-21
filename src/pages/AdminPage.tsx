@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card'
 import { getAdminStats } from '../lib/api'
 import type { AdminStats, PostCategory } from '../types'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const PIE_COLORS = ['#6c63ff', '#ff6b81', '#4ade80', '#fbbf24', '#8b5cf6', '#64748b']
 
@@ -17,12 +18,15 @@ const CATEGORY_LABELS: Record<PostCategory, string> = {
 }
 
 export function AdminPage() {
+    usePageTitle('Admin')
     const [stats, setStats] = useState<AdminStats | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         const fetch = async () => {
-            try { setStats(await getAdminStats()) } catch { /* silent */ }
+            try { setStats(await getAdminStats()) } catch (err) {
+                console.error('Failed to load admin stats:', err)
+            }
             setLoading(false)
         }
         fetch()

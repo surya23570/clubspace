@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
 import { Sparkles, Eye, EyeOff } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function RegisterPage() {
+    usePageTitle('Sign Up')
     const { signUp } = useAuth()
     const navigate = useNavigate()
     const [form, setForm] = useState({ fullName: '', email: '', password: '', department: '' })
@@ -15,6 +17,12 @@ export function RegisterPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
+
+        if (!form.email.endsWith('@klu.ac.in')) {
+            setError('Email must belong to @klu.ac.in domain')
+            return
+        }
+
         if (form.password.length < 6) {
             setError('Password must be at least 6 characters')
             return

@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
 import { Sparkles, Eye, EyeOff } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export function LoginPage() {
+    usePageTitle('Sign In')
     const { signIn } = useAuth()
     const navigate = useNavigate()
     const [form, setForm] = useState({ email: '', password: '' })
@@ -74,6 +76,15 @@ export function LoginPage() {
                                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <Link
+                            to="/forgot-password"
+                            className="text-xs text-primary-500 font-semibold hover:text-primary-600"
+                        >
+                            Forgot password?
+                        </Link>
                     </div>
 
                     {error && (

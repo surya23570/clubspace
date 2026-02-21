@@ -16,9 +16,9 @@ export function Sidebar({ mobileOpen, onNavClick }: SidebarProps) {
 
     const navItems = [
         { path: '/', icon: Home, label: 'Feed' },
-        { path: '/messages', icon: MessageCircle, label: 'Messages' },
-        { path: '/leaderboard', icon: Compass, label: 'Explore' },
         { path: '/profile', icon: Users, label: 'Profile' },
+        { path: '/leaderboard', icon: Compass, label: 'Explore' },
+        { path: '/messages', icon: MessageCircle, label: 'Messages' },
         { path: '/gallery', icon: Image, label: 'Gallery' },
         { path: '/settings', icon: Settings, label: 'Settings' },
     ]

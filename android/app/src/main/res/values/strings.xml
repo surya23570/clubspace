@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ClubSpace</string>
+    <string name="title_activity_main">ClubSpace</string>
+    <string name="package_name">com.surya.clubspace</string>
+    <string name="custom_url_scheme">com.surya.clubspace</string>
+</resources>

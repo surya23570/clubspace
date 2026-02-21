@@ -13,9 +13,11 @@ interface UserListModalProps {
     type: 'followers' | 'following' | 'requests'
     onAction?: (userId: string, action: 'follow' | 'unfollow' | 'accept' | 'reject' | 'remove') => void
     currentUserId: string
+    isOwnProfile?: boolean
+    submittingActionIds?: Set<string>
 }
 
-export function UserListModal({ isOpen, onClose, title, users, type, onAction, currentUserId }: UserListModalProps) {
+export function UserListModal({ isOpen, onClose, title, users, type, onAction, currentUserId, isOwnProfile, submittingActionIds }: UserListModalProps) {
     const navigate = useNavigate()
 
     const handleUserClick = (userId: string) => {
@@ -56,6 +58,8 @@ export function UserListModal({ isOpen, onClose, title, users, type, onAction, c
                                             variant="primary"
                                             onClick={() => onAction(user.id, 'accept')}
                                             icon={<Check size={14} />}
+                                            loading={submittingActionIds?.has(user.id)}
+                                            disabled={submittingActionIds?.has(user.id)}
                                         >
                                             Accept
                                         </Button>
@@ -64,29 +68,34 @@ export function UserListModal({ isOpen, onClose, title, users, type, onAction, c
                                             variant="secondary"
                                             onClick={() => onAction(user.id, 'reject')}
                                             icon={<XIcon size={14} />}
+                                            disabled={submittingActionIds?.has(user.id)}
                                         >
                                             Reject
                                         </Button>
                                     </>
                                 )}
 
-                                {type === 'following' && onAction && user.id !== currentUserId && (
+                                {type === 'following' && onAction && user.id !== currentUserId && isOwnProfile && (
                                     <Button
                                         size="sm"
                                         variant="ghost"
                                         className="text-surface-400 hover:text-red-500 text-xs px-2 h-7"
                                         onClick={() => onAction(user.id, 'unfollow')}
+                                        loading={submittingActionIds?.has(user.id)}
+                                        disabled={submittingActionIds?.has(user.id)}
                                     >
                                         Unfollow
                                     </Button>
                                 )}
 
-                                {type === 'followers' && onAction && currentUserId && (
+                                {type === 'followers' && onAction && currentUserId && isOwnProfile && (
                                     <Button
                                         size="sm"
                                         variant="ghost"
                                         className="text-surface-400 hover:text-red-500 text-xs px-2 h-7"
                                         onClick={() => onAction(user.id, 'remove')}
+                                        loading={submittingActionIds?.has(user.id)}
+                                        disabled={submittingActionIds?.has(user.id)}
                                     >
                                         Remove
                                     </Button>

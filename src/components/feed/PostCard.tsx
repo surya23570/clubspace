@@ -1,7 +1,9 @@
-import { Heart, MessageCircle, Eye, MoreHorizontal } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Heart, MessageCircle, Eye, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '../ui/Avatar'
 import { ReactionBar } from './ReactionBar'
+import { useAuth } from '../../context/AuthContext'
 import type { Post } from '../../types'
 
 interface PostCardProps {
@@ -11,14 +13,29 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onDelete, showActions = false }: PostCardProps) {
+    const { user } = useAuth()
+    const isOwner = user?.id === post.user_id
     const reactionCount = post.reactions?.length || 0
     const timeAgo = getTimeAgo(post.created_at)
+
+    const [showOptions, setShowOptions] = useState(false)
+    const optionsRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) {
+                setShowOptions(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     return (
         <div className="clay animate-fade-in-up">
             {/* Header */}
-            <div className="flex items-center gap-3 p-4 pb-3">
-                <Link to={`/profile/${post.profile?.id}`} className="hover:opacity-80 transition-opacity">
+            <div className="flex items-center gap-3 p-4 pb-3 relative">
+                <Link to={`/profile/${post.user_id}`} className="hover:opacity-80 transition-opacity">
                     <Avatar
                         src={post.profile?.avatar_url}
                         name={post.profile?.full_name}
@@ -26,18 +43,35 @@ export function PostCard({ post, onDelete, showActions = false }: PostCardProps)
                     />
                 </Link>
                 <div className="flex-1 min-w-0">
-                    <Link to={`/profile/${post.profile?.id}`} className="hover:underline decoration-surface-400/50 underline-offset-2">
+                    <Link to={`/profile/${post.user_id}`} className="hover:underline decoration-surface-400/50 underline-offset-2">
                         <p className="text-sm font-bold text-surface-800">{post.profile?.full_name || 'Anonymous'}</p>
                     </Link>
                     <p className="text-[11px] text-surface-400">{timeAgo} · {post.category}</p>
                 </div>
-                {showActions && onDelete && (
-                    <button
-                        onClick={() => onDelete(post.id)}
-                        className="p-1.5 rounded-full hover:bg-surface-200/50 text-surface-400 cursor-pointer transition-colors"
-                    >
-                        <MoreHorizontal size={16} />
-                    </button>
+                {showActions && isOwner && onDelete && (
+                    <div className="relative" ref={optionsRef}>
+                        <button
+                            onClick={() => setShowOptions(!showOptions)}
+                            className="p-1.5 rounded-full hover:bg-surface-200/50 text-surface-400 cursor-pointer transition-colors"
+                        >
+                            <MoreHorizontal size={16} />
+                        </button>
+
+                        {showOptions && (
+                            <div className="absolute right-0 top-full mt-1 w-36 clay bg-white rounded-[var(--radius-clay-sm)] shadow-lg z-10 overflow-hidden animate-fade-in">
+                                <button
+                                    onClick={() => {
+                                        setShowOptions(false)
+                                        onDelete(post.id)
+                                    }}
+                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-danger hover:bg-red-50 transition-colors cursor-pointer text-left"
+                                >
+                                    <Trash2 size={14} />
+                                    Delete Post
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 
