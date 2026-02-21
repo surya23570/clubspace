@@ -35,6 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     useEffect(() => {
+        // Check URL hash for email confirmation redirect (type=signup)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        if (hashParams.get('type') === 'signup' && window.location.pathname !== '/email-confirmed') {
+            window.location.href = '/email-confirmed' + window.location.hash
+            return
+        }
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session: s } }) => {
             setSession(s)
@@ -75,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             password,
             options: {
                 data: { full_name: fullName, department },
-                emailRedirectTo: `${window.location.origin}/login`,
+                emailRedirectTo: `${window.location.origin}/email-confirmed`,
             },
         })
         if (error) throw error
