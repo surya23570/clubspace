@@ -8,7 +8,7 @@ interface AuthContextType {
     profile: Profile | null
     session: Session | null
     loading: boolean
-    signUp: (email: string, password: string, fullName: string, department: string) => Promise<void>
+    signUp: (email: string, password: string, fullName: string, department: string) => Promise<{ confirmEmail: boolean }>
     signIn: (email: string, password: string) => Promise<void>
     signOut: () => Promise<void>
     refreshProfile: () => Promise<void>
@@ -66,16 +66,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             password,
             options: {
                 data: { full_name: fullName, department },
+                emailRedirectTo: `${window.location.origin}/login`,
             },
         })
         if (error) throw error
 
+        // If email confirmation is required, identities will be empty
+        const needsConfirmation = !data.session
+
         // Profile is auto-created by the database trigger (handle_new_user)
-        if (data.user) {
+        if (data.user && data.session) {
             // Small delay to let the trigger finish
             await new Promise(r => setTimeout(r, 500))
             await fetchProfile(data.user.id)
         }
+
+        return { confirmEmail: needsConfirmation }
     }
 
     const signIn = async (email: string, password: string) => {
